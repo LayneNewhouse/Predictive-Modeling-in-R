@@ -1,0 +1,788 @@
+---
+title: |
+  | Udacity - Data Analyst Nano Degree
+  | Project 4: Exploring Red Wine Quality with R
+
+author: "Created by: Layne Newhouse"
+date: "Resubmitted: November 15, 2016"
+output: html_document
+---
+***
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#Review Addition
+#create_plot <- function(variable, binwidth = 0.01) {
+  #return(ggplot(aes_string(x = variable), data = redwine) + 
+           #geom_histogram(binwidth = binwidth))
+  
+#create_plot('density', 0.01)
+```
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+setwd('D:/Udacity/DA/P4/Project')
+
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(knitr)
+library(plotly)
+library(reshape2)
+library(GGally)
+
+library(scales)
+library(memisc)
+library(lattice)
+library(MASS)
+library(car)
+library(RColorBrewer)
+
+library(psych)
+```
+
+This data set contains approximately 1,600 red wines with 11 variables regarding the chemical properties of the wine.
+At least 3 wine experts rated the quality of each wine, providing a rating between 0 (very bad) and 10 (very excellent).
+
+In this project we wish to seek which chemical properties influence the quality of red wines.
+
+## Uni/bivariate Plots Section
+
+We will begin this exploration by outputting the size of the data set ('objects' x 'variables'), an overview of each of the variable's types, as well as summary statistics regarding each of the individual predictor variables in the data set.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+redWine <- read.csv('wineQualityReds.csv')
+
+dim(redWine)
+str(redWine)
+summary(redWine)
+
+redWine$qualityF <- factor(redWine$quality)
+
+redWine <- arrange(redWine, quality)
+```
+
+The bar graph below shows the quality of wine, given as an integer, as well how many bottles were given the respective ranking.
+
+Due to the fact that this histogram is not completely normalized we should expect to see a predicting model that is biased towards the rankings 5 and 6. This is because the 5 and 6 quality rankings make up roughly 80% of all bottles of wine in the data set.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+ggplot(data = redWine, aes(x = quality)) +
+  geom_bar(fill = '#722f37') +
+  scale_x_continuous(breaks = seq(3,8,1)) +
+  xlab('Quality') +
+  ylab('Frequency')
+
+```
+
+***
+
+The section below includes individual analysis on each of the potential predicting variables for wine quality. Histograms have been created to understand the distribution of each of these variables and box plots were created to visualize statistical values for each variable as a function of quality. Two transformation were made on each variable in the form of 'square root' and 'log base 10' in order to try to achieve normality within the distributions as well as reduce the number of outliers within the respective box plots. A linear model was then created comparing these transformations to each other, as well as the un-transformed data, in attempt to decide which would be the best fit for our model. The lower the deviance, or residual sum of squares, the better fit the variable is to the linear model. In order to maintain conciseness throughout this project only one transformation and the original histogram will be shown below along with one box plot per variable.
+
+The first variable that will be analyzed is Fixed Acidity (tartaric acid - g / dm^3).
+
+Although the distribution became slightly more normalized through each transformation (square root and log base 10), the attempted transformations to this variable were not significant enough and did not decrease the linear model's deviance. Therefore the unaltered data will be used. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+p1 <- ggplot(data = redWine, aes(x = fixed.acidity)) +
+  geom_histogram(fill = '#722f37', bins = 30) +
+  labs(title='Histogram') +
+  scale_x_continuous() +
+  xlab('Fixed Acidity') +
+  ylab('Frequency')
+p2 <- ggplot(data = redWine, aes(x = fixed.acidity)) +
+  geom_histogram(fill = '#722f37', bins = 30) +
+  scale_x_log10()+
+  labs(title='Histogram - (log10)') +
+  xlab('Fixed Acidity') +
+  ylab('Frequency')
+grid.arrange(p1, p2)
+  
+ggplot(data = redWine, aes(x = qualityF, y = fixed.acidity)) +
+  geom_boxplot()+
+  labs(title='Box Plot') +
+  xlab('Quality') +
+  ylab('Fixed Acidity')
+
+m1 <- lm(quality ~ fixed.acidity, data = redWine)
+m2 <- lm(quality ~ I(sqrt(fixed.acidity)), data = redWine)
+m3 <- lm(quality ~ I(log(fixed.acidity)), data = redWine)
+mtable(m1, m2, m3)
+```
+
+Volatile Acidity (acetic acid - g / dm^3) has a distribution that is closest to normal after being transformed by the square root function. This along with having fewer outliers in the box plots as well as having the lowest deviance from the linear model makes this particular transformation valuable going forward. Since the units for this variable were g / dm^3 I was interested in seeing if the cubed root of the variable would yield a lower deviance. The results of this were that the square root transformation on Volatile Acidity was still the better transformation. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+p1 <- ggplot(data = redWine, aes(x = volatile.acidity)) +
+  geom_histogram(fill = '#722f37', bins = 30) +
+  labs(title='Histogram') +
+  scale_x_continuous() +
+  xlab('Volatile Acidity') +
+  ylab('Frequency')
+p2 <- ggplot(data = redWine, aes(x = volatile.acidity)) +
+  geom_histogram(fill = '#722f37', bins = 30) +
+  scale_x_sqrt()+
+  labs(title='Histogram - (sqrt)') +
+  xlab('Volatile Acidity') +
+  ylab('Frequency')
+grid.arrange(p1, p2)
+  
+ggplot(data = redWine, aes(x = qualityF, y = volatile.acidity)) +
+  geom_boxplot()+
+  scale_y_sqrt() +
+  labs(title='Box Plot - (sqrt)') +
+  xlab('Quality') +
+  ylab('Volatile Acidity')
+
+
+m1 <- lm(quality ~ volatile.acidity, data = redWine)
+m2 <- lm(quality ~ I(sqrt(volatile.acidity)), data = redWine)
+m3 <- lm(quality ~ I((volatile.acidity)^(1/3)), data = redWine)
+m4 <- lm(quality ~ I(log(volatile.acidity)), data = redWine)
+mtable(m1, m2, m3, m4)
+```
+
+The log transformation of the following variable can not be done due to the '0' values relating to Citric Acid (g / dm^3) content. The un-transformed version of this variable maintained the least amount of outliers while also having a lower deviance from the linear model when compared to the squared root transformation. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+p1 <- ggplot(data = redWine, aes(x = citric.acid)) +
+  geom_histogram(fill = '#722f37', bins = 30) +
+  labs(title='Histogram') +
+  scale_x_continuous() +
+  xlab('Citric Acid') +
+  ylab('Frequency')
+p2 <- ggplot(data = redWine, aes(x = citric.acid)) +
+  geom_histogram(fill = '#722f37', bins = 30) +
+  scale_x_sqrt()+
+  labs(title='Histogram - (sqrt)') +
+  xlab('Citric Acid') +
+  ylab('Frequency')
+grid.arrange(p1, p2)
+  
+ggplot(data = redWine, aes(x = qualityF, y = citric.acid)) +
+  geom_boxplot()+
+  labs(title='Box Plot') +
+  xlab('Quality') +
+  ylab('Citric Acid')
+
+m1 <- lm(quality ~ citric.acid, data = redWine)
+m2 <- lm(quality ~ I(sqrt(citric.acid)), data = redWine)
+mtable(m1, m2)
+```
+
+The log base 10 transformation of the Residual Sugar variable (g / dm^3) not only has the lowest deviance but also resembles a more normal distribution. Analysis of the linear regression table shows that regardless of the transformation, the standard errors of the linear regression estimate are far too large in comparison to the coefficients and thus are not statistically significant. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+p1 <- ggplot(data = redWine, aes(x = residual.sugar)) +
+  geom_histogram(fill = '#722f37', bins = 50) +
+  labs(title='Histogram') +
+  scale_x_continuous() +
+  xlab('Residual Sugar')
+  ylab('Frequency')
+p2 <- ggplot(data = redWine, aes(x = residual.sugar)) +
+  geom_histogram(fill = '#722f37', bins = 50) +
+  scale_x_log10()+
+  labs(title='Histogram - (log10)') +
+  xlab('Residual Sugar')
+  ylab('Frequency')
+grid.arrange(p1, p2)
+  
+ggplot(data = redWine, aes(x = qualityF, y = residual.sugar)) +
+  geom_boxplot()+
+  scale_y_log10() +
+  labs(title='Box Plot - (log10)') +
+  xlab('Quality') +
+  ylab('Residual Sugar')
+
+m1 <- lm(quality ~ residual.sugar, data = redWine)
+m2 <- lm(quality ~ I(sqrt(residual.sugar)), data = redWine)
+m3 <- lm(quality ~ I(log(residual.sugar)), data = redWine)
+mtable(m1, m2, m3)
+```
+
+The smallest deviance was obtained through the log base 10 transformation of the Chlorides variable (sodium chloride - g / dm^3). From the box plot we can see a few significant outliers especially near the bottom of the quality 7 bin.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+p1 <- ggplot(data = redWine, aes(x = chlorides)) +
+  geom_histogram(fill = '#722f37', bins = 40) +
+  labs(title='Histogram') +
+  xlab('Chlorides') +
+  ylab('Frequency')
+p2 <- ggplot(data = redWine, aes(x = chlorides)) +
+  geom_histogram(fill = '#722f37', bins = 40) +
+  scale_x_log10()+
+  labs(title='Histogram - (log10)') +
+  xlab('Chlorides') +
+  ylab('Frequency')
+grid.arrange(p1, p2)
+
+ggplot(data = redWine, aes(x = qualityF, y = chlorides)) +
+  geom_boxplot()+
+  scale_y_log10() +
+  labs(title='Box Plot - (log10)') +
+  xlab('Quality') +
+  ylab('Chlorides')
+
+m1 <- lm(quality ~ chlorides, data = redWine)
+m2 <- lm(quality ~ I(sqrt(chlorides)), data = redWine)
+m3 <- lm(quality ~ I(log(chlorides)), data = redWine)
+mtable(m1, m2, m3)
+```
+
+Attempting to transform the Free Sulfur Dioxide variable doesn't have significant impact on the deviance or the distribution. A further in depth analysis of the un-transformed variable shows margin significance in terms of predictability with a p-value of 0.58.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+p1 <- ggplot(data = redWine, aes(x = free.sulfur.dioxide)) +
+  geom_histogram(fill = '#722f37', bins = 25) +
+  labs(title='Histogram') +
+  xlab('Free Sulfur Dioxide') +
+  ylab('Frequency')
+p2 <- ggplot(data = redWine, aes(x = free.sulfur.dioxide)) +
+  geom_histogram(fill = '#722f37', bins = 25) +
+  scale_x_sqrt()+
+  labs(title='Histogram - (sqrt)') +
+  xlab('Free Sulfur Dioxide') +
+  ylab('Frequency')
+grid.arrange(p1, p2)
+
+ggplot(data = redWine, aes(x = qualityF, y = free.sulfur.dioxide)) +
+  geom_boxplot() +
+  labs(title='Box Plot') +
+  xlab('Quality') +
+  ylab('Free Sulfur Dioxide')
+
+m1 <- lm(quality ~ free.sulfur.dioxide, data = redWine)
+m2 <- lm(quality ~ I(sqrt(free.sulfur.dioxide)), data = redWine)
+m3 <- lm(quality ~ I(log(free.sulfur.dioxide)), data = redWine)
+mtable(m1, m2, m3)
+
+summary(m1)
+```
+
+The log transformation of Total Sulfur Dioxide (mg / dm^3) has a very normal distribution and is only marginally higher in terms of deviance from the linear regression model. A second version of each model was made using a data set which excludes two significant outliers ('.2'). As comparison, I have also plotted a box plot of total sulfur dioxide not separated by quality. From this type of plot we can see the significant outliers that should likely be removed from the data set.  
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+p1 <- ggplot(data = redWine, aes(x = total.sulfur.dioxide)) +
+  geom_histogram(fill = '#722f37', bins = 30) +
+  labs(title='Histogram') +
+  xlab('Total Sulfur Dioxide') +
+  ylab('Frequency')
+p2 <- ggplot(data = redWine, aes(x = total.sulfur.dioxide)) +
+  geom_histogram(fill = '#722f37', bins = 30) +
+  scale_x_log10()+
+  labs(title='Histogram - (log10)') +
+  xlab('Total Sulfur Dioxide') +
+  ylab('Frequency')
+grid.arrange(p1, p2)
+
+p1 <- ggplot(data = redWine, aes(x = qualityF, y = total.sulfur.dioxide)) +
+  geom_boxplot()+
+  scale_y_log10() +
+  labs(title='Box Plot - (log10)') +
+  xlab('Quality') +
+  ylab('Total Sulfur Dioxide')
+p2 <- ggplot(data = redWine, aes(x = '', y = total.sulfur.dioxide)) +
+  geom_boxplot() +
+  ylab('Total Sulfur Dioxide')
+grid.arrange(p1, p2)
+
+m1 <- lm(quality ~ total.sulfur.dioxide, data = redWine)
+m1.2 <- lm(quality ~ total.sulfur.dioxide, data = filter(redWine, total.sulfur.dioxide < 250))
+m2 <- lm(quality ~ I(sqrt(total.sulfur.dioxide)), data = redWine)
+m2.2 <- lm(quality ~ I(sqrt(total.sulfur.dioxide)), data = filter(redWine, total.sulfur.dioxide < 250))
+m3 <- lm(quality ~ I(log(total.sulfur.dioxide)), data = redWine)
+m3.2 <- lm(quality ~ I(log(total.sulfur.dioxide)), data = filter(redWine, total.sulfur.dioxide < 250))
+mtable(m1, m1.2, m2, m2.2, m3, m3.2)
+```
+
+The Density (g / cm^3) variable has a normal distribution and similar deviance scores to the transformed versions of this variable. The box plots show a great amount of outliers at each stage of quality. By looking at the box plot closer without the quality distinction, the outliers seem evenly distributed on each side of the box plot.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+p1 <- ggplot(data = redWine, aes(x = density)) +
+  geom_histogram(fill = '#722f37', bins = 30) +
+  labs(title='Histogram') +
+  xlab('Density') +
+  ylab('Frequency')
+p2 <- ggplot(data = redWine, aes(x = density)) +
+  geom_histogram(fill = '#722f37', bins = 30) +
+  scale_x_sqrt()+
+  labs(title='Histogram - (sqrt)') +
+  xlab('Density') +
+  ylab('Frequency')
+grid.arrange(p1, p2)
+
+p1 <- ggplot(data = redWine, aes(x = qualityF, y = density)) +
+  geom_boxplot() +
+  labs(title='Box Plot') +
+  xlab('Quality') +
+  ylab('Density')
+p2 <- ggplot(data = redWine, aes(x = '', y = density)) +
+  geom_boxplot() +
+  ylab('Density')
+grid.arrange(p1, p2)
+
+m1 <- lm(quality ~ density, data = redWine)
+m2 <- lm(quality ~ I(sqrt(density)), data = redWine)
+m3 <- lm(quality ~ I(log(density)), data = redWine)
+mtable(m1, m2, m3)
+```
+
+The pH variable shows a fairly normal distribution with only marginal significance for coefficient values in the linear model.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+p1 <- ggplot(data = redWine, aes(x = pH)) +
+  geom_histogram(fill = '#722f37', bins = 30) +
+  labs(title='Histogram') +
+  xlab('pH') +
+  ylab('Frequency')
+p2 <- ggplot(data = redWine, aes(x = pH)) +
+  geom_histogram(fill = '#722f37', bins = 30) +
+  scale_x_log10()+
+  labs(title='log10') +
+  xlab('pH') +
+  ylab('Frequency')
+grid.arrange(p1, p2)
+
+ggplot(data = redWine, aes(x = qualityF, y = pH)) +
+  geom_boxplot() +
+  labs(title='Box Plot') +
+  xlab('Quality') +
+  ylab('pH')
+
+
+m1 <- lm(quality ~ pH, data = redWine)
+m2 <- lm(quality ~ I(sqrt(pH)), data = redWine)
+m3 <- lm(quality ~ I(log(pH)), data = redWine)
+mtable(m1, m2, m3)
+```
+
+The Sulfates variable (potassium sulfate - g / dm3) show's high significance in the linear regression model with the lowest deviance being produced by the log transformation of this variable. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+p1 <- ggplot(data = redWine, aes(x = sulphates)) +
+  geom_histogram(fill = '#722f37', bins = 30) +
+  labs(title='Histogram') +
+  xlab('Sulphates') +
+  ylab('Frequency')
+p2 <- ggplot(data = redWine, aes(x = sulphates)) +
+  geom_histogram(fill = '#722f37', bins = 30) +
+  scale_x_log10()+
+  labs(title='Histogram - (log10)') +
+  xlab('Sulphates') +
+  ylab('Frequency')
+grid.arrange(p1, p2)
+
+ggplot(data = redWine, aes(x = qualityF, y = sulphates)) +
+  geom_boxplot()+
+  scale_y_log10() +
+  labs(title='Box Plot - (log10)') +
+  xlab('Quality') +
+  ylab('Sulphates')
+
+m1 <- lm(quality ~ sulphates, data = redWine)
+m2 <- lm(quality ~ I(sqrt(sulphates)), data = redWine)
+m3 <- lm(quality ~ I(log(sulphates)), data = redWine)
+mtable(m1, m2, m3)
+```
+
+Alcohol (% by volume) has its lowest deviance when not transformed and it's distributions go relatively unchanged. From the box plots alone you can see suggestions of correlation between the Alcohol % and the Quality of wine. To further investigate the correlation between alcohol and quality I created a scatter plot that shows Quality as a function of Alcohol content and includes a linear model.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+p1 <- ggplot(data = redWine, aes(x = alcohol)) +
+  geom_histogram(fill = '#722f37', bins = 30) +
+  labs(title='Histogram') +
+  xlab('Alcohol') +
+  ylab('Frequency')
+p2 <- ggplot(data = redWine, aes(x = alcohol)) +
+  geom_histogram(fill = '#722f37', bins = 30) +
+  scale_x_log10()+
+  labs(title='log10') +
+  xlab('Alcohol') +
+  ylab('Frequency')
+grid.arrange(p1, p2)
+
+ggplot(data = redWine, aes(x = qualityF, y = alcohol)) +
+  geom_boxplot() +
+  labs(title='Box Plot') +
+  xlab('Quality') +
+  ylab('Alcohol')
+
+ggplot(data = redWine, aes(x = alcohol, y = quality)) +
+  geom_point(position = 'jitter', alpha = 0.25, color = '#722f37') +
+  stat_smooth(method = 'lm') +
+  scale_x_continuous(breaks = seq(9, 15, 1)) +
+  labs(title="Scatterplot of Wine Quality vs. Alcohol Content") +
+  ylab("Quality Ranking (0-10)") +
+  xlab("Alcohol (%)") +
+  theme(plot.title = element_text(size = rel(0.75)))
+
+m1 <- lm(quality ~ alcohol, data = redWine)
+m2 <- lm(quality ~ I(sqrt(alcohol)), data = redWine)
+m3 <- lm(quality ~ I(log(alcohol)), data = redWine)
+mtable(m1, m2, m3)
+```
+***
+
+##Uni/bivariate Analysis
+
+###Structure of the dataset
+
+In the Red Wine data set there are 12 potential contributing features to wine quality and 1,599 observations of each of these features (1,599 bottles of wine to use for our analysis).
+
+Wine quality is scored as an integer between 0 and 10. The predictor variables are as follows:
+
+**Fixed Acidity** (tartaric acid - g / dm^3)
+
+**Volatile Acidity** (acetic acid - g / dm^3)
+
+**Citric Acid** (g / dm^3)
+
+**Residual Sugar** (g / dm^3)
+
+**Chlorides** (sodium chloride - g / dm^3)
+
+**Free Sulfur Dioxide** (mg / dm^3)
+
+**Total Sulfur Dioxide** (mg / dm^3)
+
+**Density** (g / cm^3)
+
+**pH**
+
+**Sulphates** (potassium sulfate - g / dm3)
+
+**Alcohol** (% by volume)
+   
+###Main features of interest in the dataset
+
+From analyzing the predictor variables in the linear models, we can see that most variables do have at least some statistical significance in terms of estimated linear coefficients with the exception of residual sugar. Although due to the nature of wine, or food and drinks in general, I believe that a good quality wine would be a function of a certain balance between these variables as well as the combined affect of some of these variables together.
+
+###New variables in the dataset
+
+The only new variable that was added to the data set was a factored version of quality so that certain analysis such as the box plots. In the case of this data set, the qualities were all in the form of integers so there was no modification needed to be made in order to round number up or down.
+
+###Variable transformation
+
+All of the variables have been put through a square root transformation as well as a log base 10 transformation in order to observe the affect these transformations would have on both the distributions as well as the linear model accuracy. 
+
+***
+
+##Multivariate Plots Section
+
+The following plot matrix looks analyses how each variable interacts with each other as well as their relationship with quality via the colour of the point. After analyzing the first plot, it was difficult to observe any potential clustering of qualities. The colour code was then changed such that only wines rated 7 or 8 would show up as red. Sorting the data set by quality made it so that the (fewer) quality 7 and 8 wines, represented by red circles, would show up on top of the black circles, which make up the majority of red wines (qualities 3-6). It is difficult to see each individual panel of the matrix in the html output so a re-created version of these pairs was made with some of the variables omitted. Further analysis on multiple variables will be explored based on these plots. *Note the quality axis labeling is offset by 2 (1->3, 6->8).   
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+theme_set(theme_minimal(20))
+red_black <- c('#000000','#000000','#000000','#000000','#ff0000','#ff0000')
+rw_subset <- subset(redWine, select = -c(X, quality, volatile.acidity, citric.acid,
+                                         residual.sugar, pH))
+#rw_subset <- subset(redWine, select = -c(X, quality))
+#The subset above shows the full matrix including all variables in the data set.
+
+pairs.panels(rw_subset, bg=c('red', 'yellow','blue', 'green', 'orange', 'purple',
+                             '#ff0000','#000000')[rw_subset$qualityF], pch=21)
+pairs.panels(rw_subset, bg=red_black[rw_subset$qualityF], pch=21)
+
+```
+
+Below are a few multivariate plots that take two predictor variables, as the x and y-axis, and represent quality via the size and colour of the points. The size adjustments were used in addition to the colour adjustment because it would allow us to better visualize the higher quality wines. QualityF and Quality-2 are slight manipulations of the quality variable. QualityF is the factored form of quality and Quality-2 allow the points on the graph to scale from 1 to 6.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(data = redWine, aes(x = I(log(sulphates)), y = alcohol, color = qualityF, 
+                           size = quality-2)) +
+  geom_point(alpha = 0.9) +
+  scale_color_brewer(palette = 'Reds')
+
+ggplot(data = redWine, aes(x = fixed.acidity, y = density, 
+                           color = qualityF, size = quality-2)) +
+  geom_point(alpha = 0.9) +
+  scale_color_brewer(palette = 'Reds')
+
+ggplot(data = filter(redWine, total.sulfur.dioxide < 250), 
+       aes(x = free.sulfur.dioxide, y = total.sulfur.dioxide, 
+           color = qualityF, size = quality-2)) +
+  geom_point(alpha = 0.9) +
+  scale_color_brewer(palette = 'Reds')
+
+ggplot(data = filter(redWine, total.sulfur.dioxide < 250), 
+       aes(x = I(log(free.sulfur.dioxide)), y = I(log(total.sulfur.dioxide)), 
+           color = qualityF, size = quality-2)) +
+  geom_point(alpha = 0.9) +
+  scale_color_brewer(palette = 'Reds')
+
+ggplot(data = filter(redWine, total.sulfur.dioxide < 250), 
+       aes(x = I(log(sulphates)), y = I(log(chlorides)), color = qualityF, 
+           size = quality-2)) +
+  geom_point(alpha = 0.9) +
+  scale_color_brewer(palette = 'Reds')
+```
+ 
+It is difficult to tell from simply observing the graphs above whether two predictors actually have significant interaction or if both variables are simply positively correlated with the output variable. To determine which variables have significant interference with each other we would have to test each variable against each other and look at each of the 55 (11 choose 2) corresponding p values. Although we could do this in practice, it is beyond the scope of this project.
+
+***
+##Building a Model
+
+According to the textbook "**An Introduction to Statistical Learning** with Applications in R" by *Garath James, Daniela Witten, Trevor Hastie,* and *Robert Tibshirani* the best way to select variables for a linear model is to use a method called *'Mixed Selection'* which is a combination of forward and backward selection. This method works as follows:
+
+*"We start with no variables in the model, and as with forward selection, we add the variable that provides the best fit. We continue to add variables one-by-one. The p-values for variables can become larger as the new predictors are added to the model. Hence, if at any point the p-value for one of the variables in the model rises above a certain threshold, then we remove that variable from the model. We continue to perform these forward and backward steps until all the variables in the model have a sufficiently low p-value, and all the variables outside the model would have a large p-value if added to the model"*
+
+The following output demonstrates the end result of iterating through the variables until none of the remaining variables had statistical significance.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+redWine2 <- filter(redWine, alcohol <= 14)
+redWine2 <- filter(redWine2, volatile.acidity < 1.5)
+redWine2 <- filter(redWine2, free.sulfur.dioxide < 60)
+redWine2 <- filter(redWine2, total.sulfur.dioxide < 250)
+redWine2 <- filter(redWine2, chlorides < 0.6 & chlorides > 0.03)
+redWine2 <- filter(redWine2, sulphates < 1.75)
+
+colnames(redWine2)[7] <- "f.s.d."
+colnames(redWine2)[8] <- "t.s.d."
+
+m1 <- lm(quality ~ fixed.acidity, data = redWine2)
+m2 <- lm(quality ~ I(sqrt(volatile.acidity)), data = redWine2)
+m3 <- lm(quality ~ citric.acid, data = redWine2)
+m4 <- lm(quality ~ residual.sugar, data = redWine2)
+m5 <- lm(quality ~ I(log(chlorides)), data = redWine2)
+m6 <- lm(quality ~ I(log(f.s.d.)), data = redWine2)
+m7 <- lm(quality ~ I(log(t.s.d.)), data = redWine2)
+m8 <- lm(quality ~ density, data = redWine2)
+m9 <- lm(quality ~ pH, data = redWine2)
+m10 <- lm(quality ~ I(log(sulphates)), data = redWine2)
+m11 <- lm(quality ~ alcohol, data = redWine2)
+m12 <- lm(quality ~ I(log(f.s.d.))*I(log(t.s.d.)), data = redWine2)
+#mtable(m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12)
+
+m1 <- lm(quality ~ alcohol, data = redWine2)
+m2 <- update(m1, ~ . + fixed.acidity)
+m3 <- update(m1, ~ . + I(sqrt(volatile.acidity)))
+m4 <- update(m1, ~ . + citric.acid)
+m5 <- update(m1, ~ . + residual.sugar)
+m6 <- update(m1, ~ . + I(log(chlorides)))
+m7 <- update(m1, ~ . + I(log(f.s.d.)))
+m8 <- update(m1, ~ . + I(log(t.s.d.)))
+m9 <- update(m1, ~ . + density)
+m10 <- update(m1, ~ . + pH)
+m11 <- update(m1, ~ . + I(log(sulphates)))
+m12 <- update(m1, ~ . + I(log(chlorides))*I(log(sulphates)))
+m13 <- update(m1, ~ . + I(log(f.s.d.))*I(log(t.s.d.)))
+#mtable(m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13)
+
+m1 <- update(m1, ~ . + I(sqrt(volatile.acidity)))
+m2 <- update(m1, ~ . + fixed.acidity)
+m3 <- update(m1, ~ . + citric.acid)
+m4 <- update(m1, ~ . + residual.sugar)
+m5 <- update(m1, ~ . + I(log(chlorides)))
+m6 <- update(m1, ~ . + I(log(f.s.d.)))
+m7 <- update(m1, ~ . + I(log(t.s.d.)))
+m8 <- update(m1, ~ . + density)
+m9 <- update(m1, ~ . + pH)
+m10 <- update(m1, ~ . + I(log(sulphates)))
+m11 <- update(m1, ~ . + I(log(chlorides))*I(log(sulphates)))
+m12 <- update(m1, ~ . + I(log(f.s.d.))*I(log(t.s.d.)))
+#mtable(m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12)
+
+m1 <- update(m1, ~ . + I(log(chlorides))*I(log(sulphates)))
+m2 <- update(m1, ~ . + fixed.acidity)
+m3 <- update(m1, ~ . + citric.acid)
+m4 <- update(m1, ~ . + residual.sugar)
+m5 <- update(m1, ~ . + I(log(f.s.d.)))
+m6 <- update(m1, ~ . + I(log(t.s.d.)))
+m7 <- update(m1, ~ . + density)
+m8 <- update(m1, ~ . + pH)
+m9 <- update(m1, ~ . + I(log(f.s.d.))*I(log(t.s.d.)))
+#mtable(m1, m2, m3, m4, m5, m6, m7, m8, m9)
+
+m1 <- update(m1, ~ . + I(log(f.s.d.))*I(log(t.s.d.)))
+m2 <- update(m1, ~ . + fixed.acidity)
+m3 <- update(m1, ~ . + citric.acid)
+m4 <- update(m1, ~ . + residual.sugar)
+m5 <- update(m1, ~ . + density)
+m6 <- update(m1, ~ . + pH)
+#mtable(m1, m2, m3, m4, m5, m6)
+
+m1 <- update(m1, ~ . + pH)
+m2 <- update(m1, ~ . + fixed.acidity)
+m3 <- update(m1, ~ . + citric.acid)
+m4 <- update(m1, ~ . + residual.sugar)
+m5 <- update(m1, ~ . + density)
+mtable(m1, m2, m3, m4, m5)
+
+m1 <- lm(quality ~ alcohol, data = redWine2)
+m1 <- update(m1, ~ . + I(sqrt(volatile.acidity)))
+m1 <- update(m1, ~ . + I(log(chlorides))*I(log(sulphates)))
+m1 <- update(m1, ~ . + I(log(f.s.d.))*I(log(t.s.d.)))
+m1 <- update(m1, ~ . + pH)
+
+summary(m1)
+#Started with R^2 = 0.3588 before removal of outliers
+```
+
+Shortened versions of the Free Sulfur Dioxide and Total Sulfur Dioxide had to be made in order for the chart to fit properly in the html file. Below are some of the box plots of the variables that qualified for the model. I wanted to see specifically what affect removing some of the major outliers would have on the R^2 value so I modified the inputs to the models with and without removing the outliers seen in the plots below. The results of this experiment were:
+
+*Before removing outliers:* R^2 = 0.3588
+
+*After removing outliers:* R^2 = 0.3786
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+p1 <- ggplot(data = redWine, aes(x = '', y = alcohol)) +
+  geom_boxplot() +
+  labs(title='Alcohol') +
+  ylab('%')
+grid.arrange(p1)
+p2 <- ggplot(data = redWine, aes(x = '', y = volatile.acidity)) +
+  geom_boxplot() +
+  labs(title='Volatile Acidity') +
+  ylab('g/dm^3')
+grid.arrange(p1, p2, ncol=2)
+
+p1 <- ggplot(data = redWine, aes(x = '', y = free.sulfur.dioxide)) +
+  geom_boxplot() +
+  labs(title='Free Sulfur Dioxide') +
+  ylab('mg/dm^3')
+p2 <- ggplot(data = redWine, aes(x = '', y =chlorides)) +
+  geom_boxplot() +
+  labs(title='Chlorides') +
+  ylab('mg/dm^3')
+grid.arrange(p1, p2, ncol=2)
+
+p1 <- ggplot(data = redWine, aes(x = '', y = total.sulfur.dioxide)) +
+  geom_boxplot() +
+  labs(title='Total Sulfur Dioxide') +
+  ylab('g/dm^3')
+p2 <- ggplot(data = redWine, aes(x = '', y = sulphates)) +
+  geom_boxplot() +
+  labs(title='Sulphates')  +
+  ylab('g/dm^3')
+grid.arrange(p1, p2, ncol=2)
+```
+
+In order to give us an idea of how this model actually functions, beyond the statistical analysis, I chose one random red wine from each quality bin and put our model up to the test of predicting it's quality. The output below shows the actual quality, followed by what the model predicted "fit" and the upper and lower boundaries at 95% confidence. Moving the 95% confidence value to 99% or 99.9% would further spread the boundaries away from the mean, or fitted value. The far left number is the row number that the wine is associated with.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+thisRedWine <- dplyr::select(redWine2[5,], alcohol, volatile.acidity, sulphates,
+                         t.s.d., chlorides, pH,
+                         f.s.d.)
+modelEstimate = predict(m1, newdata = thisRedWine,
+                        interval="prediction", level = .95)
+dplyr::select(redWine2[5,],quality)
+modelEstimate
+
+thisRedWine <- dplyr::select(redWine2[40,], alcohol, volatile.acidity, sulphates,
+                         t.s.d., chlorides, pH,
+                         f.s.d.)
+modelEstimate = predict(m1, newdata = thisRedWine,
+                        interval="prediction", level = .95)
+dplyr::select(redWine2[40,],quality)
+modelEstimate
+
+thisRedWine <- dplyr::select(redWine2[161,], alcohol, volatile.acidity, sulphates,
+                         t.s.d., chlorides, pH,
+                         f.s.d.)
+modelEstimate = predict(m1, newdata = thisRedWine,
+                        interval="prediction", level = .95)
+dplyr::select(redWine2[161,],quality)
+modelEstimate
+
+
+thisRedWine <- dplyr::select(redWine2[768,], alcohol, volatile.acidity, sulphates,
+                         t.s.d., chlorides, pH,
+                         f.s.d.)
+modelEstimate = predict(m1, newdata = thisRedWine,
+                        interval="prediction", level = .95)
+dplyr::select(redWine2[768,],quality)
+modelEstimate
+
+thisRedWine <- dplyr::select(redWine2[1424,], alcohol, volatile.acidity, sulphates,
+                         t.s.d., chlorides, pH,
+                         f.s.d.)
+modelEstimate = predict(m1, newdata = thisRedWine,
+                        interval="prediction", level = .95)
+dplyr::select(redWine2[1424,],quality)
+modelEstimate
+
+thisRedWine <- dplyr::select(redWine2[1580,], alcohol, volatile.acidity, sulphates,
+                         t.s.d., chlorides, pH,
+                         f.s.d.)
+modelEstimate = predict(m1, newdata = thisRedWine,
+                        interval="prediction", level = .99)
+dplyr::select(redWine2[1580,],quality)
+modelEstimate
+```
+
+We can see from these results that the model does an decent job of giving a ballpark estimate for the quality of the red wine.
+
+***
+##Final Plots and Summarry
+
+###Plot One
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(data = redWine, aes(x = quality)) +
+  geom_bar(fill = '#722f37') +
+  scale_x_continuous(breaks = seq(3,8,1)) +
+  labs(title='Histogram of Red Wine Qualities (0-10)')+
+  xlab('Quality') +
+  ylab('Frequency')
+```
+
+###Description One
+
+The histogram above depicting red wine quality is heavily centered around the 5 and 6 quality rankings. With approximately 80% of the observations being 5's and 6's a normalized distribution, which is desired, is not given to us in this data set. This will cause our predictive models to be less accurate for wine qualities in the 3-4 area and the 7-8 area. 
+
+###Plot Two
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(data = redWine, aes(x = alcohol, y = quality)) +
+  geom_point(position = 'jitter', alpha = 0.25, color = '#722f37') +
+  stat_smooth(method = 'lm') +
+  scale_x_continuous(breaks = seq(9, 15, 1)) +
+  labs(title="Scatterplot of Wine Quality vs. Alcohol Content") +
+  ylab("Quality Ranking (0-10)") +
+  xlab("Alcohol (%)") +
+  theme(plot.title = element_text(size = rel(0.75)))
+
+#Review addition
+#corr <- cor.test(x=cars$speed, y=cars$dist, method = 'pearson')
+#corr
+```
+
+###Description Two
+
+The scatter plot of wine quality vs alcohol content shows the predictor variable that has the highest statistical significance of all variables in the data set. Intuitively, it doesn't really make sense that by adding additional alcohol would increase the quality of wine, but in the case of this data set it seems that wines of the higher alcohol content tend to have properties of a higher quality wine. Something else that can be taken from this graph is that we are able to observe a heavy grouping of rank 5 wines that have alcohol content between 9 and 10 percent. 
+
+###Plot Three
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(data = redWine2, 
+       aes(x = I(log(sulphates)), y = I(log(chlorides)), color = qualityF)) +
+  geom_point(alpha = 0.9, size = 5) +
+  labs(title="Multivariate Analysis of Sulphates and Chlorides against Quality",
+       color="Quality") +
+  ylab("Log(Chlorides) (sodium chloride - g / dm^3)") +
+  xlab("Log(Sulphates) (potassium sulphate - g / dm3)") +
+  scale_color_brewer(palette = 'Reds') +
+  theme(plot.title = element_text(size = rel(0.75)),
+        axis.title.y = element_text(size = rel(.5)),
+        axis.title.x = element_text(size = rel(.5))) 
+
+```
+
+###Description Three
+
+When trying to find interaction between variables I searched for areas which had wine quality clustering within the produced matrices. The Sulfate and Chlorides interaction stood out to me and when added to the linear model it produced a highly significant coefficient with relatively low deviance. The log base 10 transformation of these variables was used. 
+
+***
+##Reflection
+
+The Red Wine data set contains information on almost 1,600 bottles of red wine across 12 different variables, 11 predictor variables and 1 output variable (Quality). I started this investigation by looking at the distribution of each of the predictor variables via a histogram, as well as looking at the direct correlation between each individual variable and quality. From this point I used the knowledge of the distributions along with the correlations each variable had with the output variable to determine if any variable transformations should be made i.e. the square root and the log base 10 transformations. 
+
+There were clear trends between a few of the variables such as alcohol and quality that were obvious right away. Next I began to look into how the predicting variables interacted with each other via a matrix. It was difficult to tell from this output alone what kind of variables might have interaction which would further improve the model I was about to make. It seemed, after further reading, that the best way to determine interaction is my modeling each pair of variables one by one and looking at the corresponding p-value. This seemed cumbersome and outside of the scope of this document and so I chose a couple pairs and brought them into my model analysis.
+
+After iterating through the model and clearing out some extreme outliers, I was able to create a linear model with an R^2 value of 0.3763. This means that there is a 37.86% correlation between the input variables that had made it through the iterative process (Alcohol, Volatile Acidity, Sulfates, Chlorides, Total Sulfur Dioxide, Free Sulfur Dioxide, and pH) and the Quality of the red wine. It makes sense that we could not come up with a perfect model as the quality of something such as wine can be fairly subjective. It is also important to note that the quality of red wine is most likely a function of a number of related variables all working together rather then individual predictors.
+
+It would likely be the case that with a larger data set and further analysis on the interaction between variables we could create an even stronger model for predicting red wine quality. As well, we could additionally look for correlation between variables and remove variables that seemed to be highly correlated with each other as they may be providing the same information multiple times. There may also may be additional transformations that could have been done to the variables individually as well different ways to combine the variables.
+
